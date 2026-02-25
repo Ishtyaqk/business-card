@@ -460,6 +460,13 @@ input,textarea,select { font-family:inherit; }
         <button class="btn btn-dark" onclick="saveVCard()">💾 Save Contact</button>
         <button class="btn btn-ghost" onclick="openShareModal()">🔗 Share</button>
       </div>
+      <div id="nfc-row" style="display:none;margin-bottom:22px">
+        <button class="btn" id="nfc-btn" onclick="shareViaNFC()" style="width:100%;background:#1a1a2e;color:#fff;justify-content:center;gap:10px;font-size:14px;padding:13px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          Share via NFC
+        </button>
+        <p id="nfc-status" style="text-align:center;font-size:12px;color:var(--muted);margin-top:8px;min-height:18px"></p>
+      </div>
       <div class="qr-wrap">
         <div class="qr-label">Scan to share this card</div>
         <div class="qr-inner" id="bcard-qr"></div>
@@ -836,6 +843,9 @@ function renderCard(card) {
   link('💼','LinkedIn',card.linkedin?'View Profile':null,card.linkedin,'#e8eaf6');
   link('𝕏','Twitter/X',card.twitter?'View Profile':null,card.twitter,'#e0f7fa');
 
+  // Init NFC button visibility
+  initNFC();
+
   // Show edit button only if this device owns the card
   const editBtn = document.getElementById('edit-card-btn');
   if (editBtn) editBtn.style.display = isMine(card.handle) ? 'inline-flex' : 'none';
@@ -1089,6 +1099,82 @@ async function deleteCurrentCard() {
   closeEditModal();
   history.pushState(null, '', location.pathname);
   showPage('landing');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  WEB NFC
+// ═══════════════════════════════════════════════════════════════
+function initNFC() {
+  // Only show NFC button if Web NFC is supported (Android Chrome)
+  if ('NDEFReader' in window) {
+    document.getElementById('nfc-row').style.display = 'block';
+  }
+}
+
+let nfcController = null; // to abort previous NFC write if needed
+
+async function shareViaNFC() {
+  if (!('NDEFReader' in window)) {
+    toast('NFC not supported on this device/browser.');
+    return;
+  }
+
+  const btn = document.getElementById('nfc-btn');
+  const status = document.getElementById('nfc-status');
+  const url = getCardUrl(currentCard.handle);
+
+  // If already writing, abort it
+  if (nfcController) {
+    nfcController.abort();
+    nfcController = null;
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg> Share via NFC`;
+    btn.style.background = '#1a1a2e';
+    status.textContent = '';
+    return;
+  }
+
+  try {
+    nfcController = new AbortController();
+    const ndef = new NDEFReader();
+
+    btn.innerHTML = `<div class="spinner"></div> Hold phones together… (tap to cancel)`;
+    btn.style.background = '#2a6b4a';
+    status.textContent = 'Waiting for nearby device…';
+
+    await ndef.write(
+      { records: [{ recordType: 'url', data: url }] },
+      { signal: nfcController.signal }
+    );
+
+    // Success
+    btn.innerHTML = `✓ Shared!`;
+    btn.style.background = '#2a6b4a';
+    status.textContent = 'Card sent successfully!';
+    toast('✓ Card shared via NFC!');
+
+    // Reset after 3 seconds
+    setTimeout(() => {
+      nfcController = null;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg> Share via NFC`;
+      btn.style.background = '#1a1a2e';
+      status.textContent = '';
+    }, 3000);
+
+  } catch(err) {
+    nfcController = null;
+    btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg> Share via NFC`;
+    btn.style.background = '#1a1a2e';
+
+    if (err.name === 'AbortError') {
+      status.textContent = '';
+    } else if (err.name === 'NotAllowedError') {
+      status.textContent = 'NFC permission denied. Check browser settings.';
+      toast('NFC permission denied.');
+    } else {
+      status.textContent = 'NFC failed: ' + err.message;
+      toast('NFC error: ' + err.message);
+    }
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
