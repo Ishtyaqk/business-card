@@ -529,6 +529,15 @@ let localCards = JSON.parse(localStorage.getItem('tc_local_cards') || '[]'); // 
 let handleCheckTimer = null;
 
 // ═══════════════════════════════════════════════════════════════
+//  URL HELPER — always generates clean shareable URLs
+// ═══════════════════════════════════════════════════════════════
+function cardUrl(handle) {
+  // Strip /index.html if present so URL is always clean e.g. https://site.com/#card/alex
+  const base = location.origin + location.pathname.replace(/\/index\.html$/, '/').replace(/([^/])$/, '$1');
+  return base + '#card/' + handle;
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  ROUTING — URL hash → #card/<handle>
 // ═══════════════════════════════════════════════════════════════
 async function routeHash() {
@@ -537,7 +546,14 @@ async function routeHash() {
   const handle = hash.replace('#card/','').trim();
   if (!handle) return false;
 
-  const card = await fetchCardByHandle(handle);
+  // Retry up to 3 times in case Supabase client is still initializing
+  let card = null;
+  for (let i = 0; i < 3; i++) {
+    card = await fetchCardByHandle(handle);
+    if (card) break;
+    if (i < 2) await new Promise(r => setTimeout(r, 600));
+  }
+
   if (card) { renderCard(card); showPage('card-view', false); }
   else       { showPage('not-found', false); }
   return true;
@@ -700,7 +716,7 @@ async function createCard() {
     const saved = await saveCard(card);
     currentCard = saved;
     renderCard(saved);
-    history.replaceState(null, '', `#card/${handle}`);
+    history.replaceState(null, '', '#card/' + handle);
     showPage('card-view', false);
     toast('✓ Card created!');
   } catch(err) {
@@ -758,7 +774,7 @@ function renderCard(card) {
   // QR
   const qrEl = document.getElementById('bcard-qr');
   qrEl.innerHTML = '';
-  const cardUrl = `${location.origin}${location.pathname}#card/${card.handle}`;
+  const cardUrl = window.cardUrl ? cardUrl(card.handle) : (location.origin + location.pathname.replace(/\/index\.html$/, '') + '#card/' + card.handle);
   new QRCode(qrEl, { text: cardUrl, width: 120, height: 120, colorDark: card.color, colorLight: '#ffffff' });
 }
 
@@ -792,7 +808,7 @@ function saveVCard() {
 //  SHARE MODAL
 // ═══════════════════════════════════════════════════════════════
 function openShareModal() {
-  const url = `${location.origin}${location.pathname}#card/${currentCard.handle}`;
+  const url = location.origin + location.pathname.replace(/\/index\.html$/, '') + '#card/' + currentCard.handle;
   document.getElementById('share-url-input').value = url;
   const qrEl = document.getElementById('share-qr');
   qrEl.innerHTML = '';
@@ -846,7 +862,7 @@ async function loadDashboard() {
 
 function viewCardObj(card) {
   renderCard(card);
-  history.pushState(null, '', `#card/${card.handle}`);
+  history.pushState(null, '', '#card/' + card.handle);
   showPage('card-view', false);
 }
 
@@ -893,17 +909,24 @@ function toast(msg) {
 //  BOOT
 // ═══════════════════════════════════════════════════════════════
 (async function boot() {
-  // Pre-fill setup form if creds saved
-  const { url, key } = getCfg();
-  if (url) document.getElementById('sb-url').value = url;
-  if (key) document.getElementById('sb-key').value = key;
-
   initSupabase();
   checkSetupBanner();
 
-  // Check for deep-link
-  const wasRoute = await routeHash();
-  if (!wasRoute) showPage('landing');
+  // Give Supabase client a moment to be ready, then route
+  const hash = location.hash;
+  if (hash.startsWith('#card/')) {
+    // Show a loading state while we fetch
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.body.insertAdjacentHTML('beforeend',
+      '<div id="boot-loader" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--paper);z-index:999;font-family:\'DM Sans\',sans-serif;color:var(--muted);font-size:15px;">Loading card…</div>'
+    );
+    const wasRoute = await routeHash();
+    const loader = document.getElementById('boot-loader');
+    if (loader) loader.remove();
+    if (!wasRoute) showPage('landing');
+  } else {
+    showPage('landing');
+  }
 })();
 </script>
 </body>
