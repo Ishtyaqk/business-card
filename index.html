@@ -439,9 +439,12 @@ input,textarea,select { font-family:inherit; }
 
 <!-- ══════════ CARD VIEW ══════════ -->
 <div id="card-view" class="page">
-  <div style="width:100%;max-width:400px;padding:16px 0 8px;display:flex;justify-content:space-between;align-items:center">
-    <button class="btn btn-ghost" onclick="history.back()" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">← Back</button>
-    <button class="btn btn-ghost" onclick="showPage('create')" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">+ Create Yours</button>
+  <div style="width:100%;max-width:400px;padding:16px 0 8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+    <button class="btn btn-ghost" onclick="goBack()" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">← Back</button>
+    <div style="display:flex;gap:8px">
+      <button id="edit-card-btn" class="btn btn-ghost" onclick="openEditModal()" style="display:none;background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">✏️ Edit</button>
+      <button class="btn btn-ghost" onclick="showPage('create')" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">+ Create Yours</button>
+    </div>
   </div>
   <div class="bcard" id="bcard">
     <div class="bcard-top" id="bcard-top">
@@ -474,6 +477,50 @@ input,textarea,select { font-family:inherit; }
   <h2>404 — Card Not Found</h2>
   <p>This handle doesn't exist yet.</p>
   <button class="btn btn-accent" onclick="showPage('create')">Create a Card</button>
+</div>
+
+
+<!-- ══════════ EDIT MODAL ══════════ -->
+<div id="edit-modal" style="display:none">
+  <div class="overlay" onclick="if(event.target.classList.contains('overlay'))closeEditModal()">
+    <div class="modal" style="max-width:520px;max-height:90vh;overflow-y:auto">
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+      <h3>Edit Card</h3>
+      <div class="sub">Changes save instantly to Supabase.</div>
+
+      <div class="form-grid" style="margin-bottom:12px">
+        <div class="field"><label>First Name</label><input id="e-fname"></div>
+        <div class="field"><label>Last Name</label><input id="e-lname"></div>
+        <div class="field"><label>Job Title</label><input id="e-title"></div>
+        <div class="field"><label>Company</label><input id="e-company"></div>
+        <div class="field full"><label>Bio</label><textarea id="e-bio" style="min-height:64px"></textarea></div>
+        <div class="field"><label>Phone</label><input id="e-phone" type="tel"></div>
+        <div class="field"><label>Email</label><input id="e-email" type="email"></div>
+        <div class="field full"><label>Website</label><input id="e-website" type="url"></div>
+        <div class="field full"><label>LinkedIn URL</label><input id="e-linkedin" type="url"></div>
+        <div class="field full"><label>Twitter / X</label><input id="e-twitter" type="url"></div>
+      </div>
+
+      <div style="margin-bottom:16px">
+        <div class="field" style="margin-bottom:10px"><label>Card Color</label></div>
+        <div class="color-swatches" id="edit-swatches">
+          <div class="swatch" data-c="#0e0e0e" style="background:#0e0e0e" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#c84b2f" style="background:#c84b2f" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#1a3a5c" style="background:#1a3a5c" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#2a6b4a" style="background:#2a6b4a" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#6b4fa0" style="background:#6b4fa0" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#b5460e" style="background:#b5460e" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#1b4f72" style="background:#1b4f72" onclick="pickEditColor(this)"></div>
+          <div class="swatch" data-c="#333333" style="background:#333333" onclick="pickEditColor(this)"></div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-accent" id="save-edit-btn" onclick="saveEdit()" style="flex:2">Save Changes</button>
+        <button class="btn btn-ghost" style="color:var(--accent);flex:1" onclick="deleteCurrentCard()">Delete Card</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ══════════ SHARE MODAL ══════════ -->
@@ -717,6 +764,7 @@ async function createCard() {
     };
 
     const saved = await saveCard(card);
+    claimCard(handle); // mark as owned on this device
     currentCard = saved;
     renderCard(saved);
     history.replaceState(null, '', '#card/' + handle);
@@ -787,6 +835,10 @@ function renderCard(card) {
   link('🌐','Website',card.website?.replace(/https?:\/\//,''),card.website,'#fff8e1');
   link('💼','LinkedIn',card.linkedin?'View Profile':null,card.linkedin,'#e8eaf6');
   link('𝕏','Twitter/X',card.twitter?'View Profile':null,card.twitter,'#e0f7fa');
+
+  // Show edit button only if this device owns the card
+  const editBtn = document.getElementById('edit-card-btn');
+  if (editBtn) editBtn.style.display = isMine(card.handle) ? 'inline-flex' : 'none';
 
   // QR
   const qrEl = document.getElementById('bcard-qr');
@@ -872,7 +924,7 @@ async function loadDashboard() {
       <div class="thumb-body"><div class="thumb-email">${c.email||''}</div></div>
       <div class="thumb-actions">
         <button class="btn btn-ghost" onclick="event.stopPropagation();shareCardObj(${JSON.stringify(c)})">Share</button>
-        <button class="btn btn-ghost" style="color:var(--accent)" onclick="event.stopPropagation();confirmDelete(${c.id||`'`+c.handle+`'`})">Delete</button>
+        ${isMine(c.handle) ? `<button class="btn btn-ghost" style="color:var(--accent)" onclick="event.stopPropagation();confirmDelete(${JSON.stringify(c.id||c.handle)})">Delete</button>` : ''}
       </div>
     </div>`).join('');
 }
@@ -907,6 +959,136 @@ function toast(msg) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  OWNERSHIP — token stored in localStorage per card handle
+// ═══════════════════════════════════════════════════════════════
+function getMyTokens() {
+  return JSON.parse(localStorage.getItem('tc_owned') || '{}');
+}
+function claimCard(handle) {
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const owned = getMyTokens();
+  owned[handle] = token;
+  localStorage.setItem('tc_owned', JSON.stringify(owned));
+  return token;
+}
+function isMine(handle) {
+  const owned = getMyTokens();
+  return !!owned[handle];
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BACK NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function goBack() {
+  // If there's real history, go back, but also listen for popstate to re-render
+  if (document.referrer && document.referrer.includes(location.hostname)) {
+    history.back();
+  } else {
+    history.pushState(null, '', location.pathname);
+    showPage('landing');
+  }
+}
+// Re-render page when browser back/forward is used
+window.addEventListener('popstate', async () => {
+  const hash = location.hash;
+  if (hash.startsWith('#card/')) {
+    await routeHash();
+  } else {
+    showPage('landing');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  EDIT CARD
+// ═══════════════════════════════════════════════════════════════
+let editColor = '#0e0e0e';
+
+function openEditModal() {
+  const c = currentCard;
+  document.getElementById('e-fname').value   = c.fname    || '';
+  document.getElementById('e-lname').value   = c.lname    || '';
+  document.getElementById('e-title').value   = c.title    || '';
+  document.getElementById('e-company').value = c.company  || '';
+  document.getElementById('e-bio').value     = c.bio      || '';
+  document.getElementById('e-phone').value   = c.phone    || '';
+  document.getElementById('e-email').value   = c.email    || '';
+  document.getElementById('e-website').value = c.website  || '';
+  document.getElementById('e-linkedin').value= c.linkedin || '';
+  document.getElementById('e-twitter').value = c.twitter  || '';
+
+  editColor = c.color || '#0e0e0e';
+  document.querySelectorAll('#edit-swatches .swatch').forEach(s => {
+    s.classList.toggle('on', s.dataset.c === editColor);
+  });
+
+  document.getElementById('edit-modal').style.display = 'block';
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+}
+
+function pickEditColor(el) {
+  document.querySelectorAll('#edit-swatches .swatch').forEach(s => s.classList.remove('on'));
+  el.classList.add('on');
+  editColor = el.dataset.c;
+}
+
+async function saveEdit() {
+  const btn = document.getElementById('save-edit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  const updates = {
+    fname:    document.getElementById('e-fname').value.trim(),
+    lname:    document.getElementById('e-lname').value.trim(),
+    title:    document.getElementById('e-title').value.trim(),
+    company:  document.getElementById('e-company').value.trim(),
+    bio:      document.getElementById('e-bio').value.trim(),
+    phone:    document.getElementById('e-phone').value.trim(),
+    email:    document.getElementById('e-email').value.trim(),
+    website:  document.getElementById('e-website').value.trim(),
+    linkedin: document.getElementById('e-linkedin').value.trim(),
+    twitter:  document.getElementById('e-twitter').value.trim(),
+    color:    editColor,
+  };
+
+  try {
+    if (sbClient) {
+      const { error } = await sbClient.from('cards').update(updates).eq('handle', currentCard.handle);
+      if (error) throw error;
+    } else {
+      // localStorage fallback
+      const idx = localCards.findIndex(c => c.handle === currentCard.handle);
+      if (idx > -1) { localCards[idx] = { ...localCards[idx], ...updates }; }
+      localStorage.setItem('tc_local_cards', JSON.stringify(localCards));
+    }
+    currentCard = { ...currentCard, ...updates };
+    renderCard(currentCard);
+    closeEditModal();
+    toast('✓ Card updated!');
+  } catch(err) {
+    toast('Error: ' + (err.message || 'Could not save.'));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Changes';
+  }
+}
+
+async function deleteCurrentCard() {
+  if (!confirm('Delete this card permanently?')) return;
+  await deleteCardById(currentCard.id || currentCard.handle);
+  // Remove ownership token
+  const owned = getMyTokens();
+  delete owned[currentCard.handle];
+  localStorage.setItem('tc_owned', JSON.stringify(owned));
+  toast('Card deleted.');
+  closeEditModal();
+  history.pushState(null, '', location.pathname);
+  showPage('landing');
 }
 
 // ═══════════════════════════════════════════════════════════════
