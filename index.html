@@ -440,6 +440,10 @@ input,textarea,select { font-family:inherit; }
 
 <!-- ══════════ CARD VIEW ══════════ -->
 <div id="card-view" class="page">
+  <div style="width:100%;max-width:400px;padding:16px 0 8px;display:flex;justify-content:space-between;align-items:center">
+    <button class="btn btn-ghost" onclick="history.back()" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">← Back</button>
+    <button class="btn btn-ghost" onclick="showPage('create')" style="background:rgba(255,255,255,.85);backdrop-filter:blur(8px);padding:8px 16px;font-size:13px">+ Create Yours</button>
+  </div>
   <div class="bcard" id="bcard">
     <div class="bcard-top" id="bcard-top">
       <div class="bcard-avi" id="bcard-avi">😊</div>
