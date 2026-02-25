@@ -309,9 +309,7 @@ input,textarea,select { font-family:inherit; }
 
 <!-- ══════════ LANDING ══════════ -->
 <div id="landing" class="page active">
-  <div id="setup-banner" class="setup-banner" style="display:none">
-    ⚠️ Supabase not configured — cards won't persist across devices. <a onclick="showPage('setup')">Set up now →</a>
-  </div>
+
   <nav class="nav">
     <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
     <div class="nav-actions">
@@ -337,65 +335,7 @@ input,textarea,select { font-family:inherit; }
   </div>
 </div>
 
-<!-- ══════════ SETUP ══════════ -->
-<div id="setup" class="page">
-  <nav class="nav">
-    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
-  </nav>
-  <div class="inner" style="max-width:640px;margin:0 auto;padding:40px 24px">
-    <div class="back-row"><button class="btn btn-ghost" onclick="showPage('landing')" style="padding:8px 14px">← Back</button></div>
-    <h2>Connect Supabase</h2>
-    <p class="sub">Supabase is a free database. It stores your cards so they work on any device, anywhere. Setup takes ~2 minutes.</p>
 
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">Step 1</div>
-        <h4>Create a free Supabase project</h4>
-        <p>Go to <a href="https://supabase.com" target="_blank" style="color:var(--accent)">supabase.com</a> → Sign up → New Project. Takes 1 minute.</p>
-      </div>
-      <div class="step">
-        <div class="step-num">Step 2</div>
-        <h4>Run this SQL to create the cards table</h4>
-        <p>In Supabase → SQL Editor → paste and run:</p>
-        <div class="sql-block" id="sql-block">create table if not exists cards (
-  id          bigint generated always as identity primary key,
-  handle      text unique not null,
-  color       text default '#0e0e0e',
-  avatar      text,
-  fname       text,
-  lname       text,
-  title       text,
-  company     text,
-  bio         text,
-  phone       text,
-  email       text,
-  website     text,
-  linkedin    text,
-  twitter     text,
-  created_at  timestamptz default now()
-);
-
--- Allow anyone to read cards (public profiles)
-alter table cards enable row level security;
-create policy "Public read" on cards for select using (true);
-create policy "Public insert" on cards for insert with check (true);
-create policy "Public update" on cards for update using (true);
-create policy "Public delete" on cards for delete using (true);<button class="copy-sql" onclick="copySql()">Copy</button></div>
-      </div>
-      <div class="step">
-        <div class="step-num">Step 3</div>
-        <h4>Paste your Supabase credentials below</h4>
-        <p>Project Settings → API → copy <code>Project URL</code> and <code>anon public</code> key.</p>
-      </div>
-    </div>
-
-    <div class="config-form">
-      <input type="url" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
-      <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." autocomplete="off">
-      <button class="btn btn-accent" style="width:100%" onclick="saveConfig()">Save & Connect</button>
-    </div>
-  </div>
-</div>
 
 <!-- ══════════ CREATE ══════════ -->
 <div id="create" class="page">
@@ -560,8 +500,8 @@ const STORAGE_PREFIX = 'tc_';
 
 function getCfg() {
   return {
-    url: localStorage.getItem('tc_sb_url') || '',
-    key: localStorage.getItem('tc_sb_key') || ''
+    url: 'https://vdzmlsxcgbylodkhclmn.supabase.co',
+    key: 'sb_publishable_nPclAqsHugmrLBPOg3qQ9w_r6o33LBe'
   };
 }
 
@@ -607,26 +547,7 @@ window.addEventListener('hashchange', routeHash);
 // ═══════════════════════════════════════════════════════════════
 //  SUPABASE SETUP
 // ═══════════════════════════════════════════════════════════════
-function saveConfig() {
-  const url = document.getElementById('sb-url').value.trim();
-  const key = document.getElementById('sb-key').value.trim();
-  if (!url || !key) { toast('Please enter both URL and key.'); return; }
-  localStorage.setItem('tc_sb_url', url);
-  localStorage.setItem('tc_sb_key', key);
-  if (initSupabase()) {
-    toast('✓ Connected to Supabase!');
-    document.getElementById('setup-banner').style.display = 'none';
-    showPage('create');
-  } else {
-    toast('Could not connect — check credentials.');
-  }
-}
 
-function copySql() {
-  const text = document.getElementById('sql-block').innerText.replace('Copy','').trim();
-  navigator.clipboard.writeText(text);
-  toast('SQL copied!');
-}
 
 // ═══════════════════════════════════════════════════════════════
 //  DATABASE HELPERS
@@ -693,10 +614,7 @@ function showPage(id, updateHash = true) {
   if (id === 'landing') checkSetupBanner();
 }
 
-function checkSetupBanner() {
-  const banner = document.getElementById('setup-banner');
-  banner.style.display = supabase ? 'none' : 'block';
-}
+function checkSetupBanner() { /* credentials hardcoded, no banner needed */ }
 
 // ═══════════════════════════════════════════════════════════════
 //  CREATE CARD
