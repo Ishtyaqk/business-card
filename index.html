@@ -531,7 +531,7 @@ let handleCheckTimer = null;
 // ═══════════════════════════════════════════════════════════════
 //  URL HELPER — always generates clean shareable URLs
 // ═══════════════════════════════════════════════════════════════
-function cardUrl(handle) {
+function getCardUrl(handle) {
   // Strip /index.html if present so URL is always clean e.g. https://site.com/#card/alex
   const base = location.origin + location.pathname.replace(/\/index\.html$/, '/').replace(/([^/])$/, '$1');
   return base + '#card/' + handle;
@@ -720,7 +720,21 @@ async function createCard() {
     showPage('card-view', false);
     toast('✓ Card created!');
   } catch(err) {
-    toast('Error: ' + (err.message || 'Could not save card.'));
+    // If duplicate handle, just load the existing card
+    if (err.message && err.message.includes('duplicate key')) {
+      const existing = await fetchCardByHandle(handle);
+      if (existing) {
+        currentCard = existing;
+        renderCard(existing);
+        history.replaceState(null, '', '#card/' + handle);
+        showPage('card-view', false);
+        toast('Card already exists — showing your card.');
+        return;
+      }
+      toast('That handle is already taken. Please choose another.');
+    } else {
+      toast('Error: ' + (err.message || 'Could not save card.'));
+    }
   } finally {
     btn.disabled = false;
     btn.innerHTML = 'Generate My Card ✦';
@@ -774,7 +788,7 @@ function renderCard(card) {
   // QR
   const qrEl = document.getElementById('bcard-qr');
   qrEl.innerHTML = '';
-  const cardUrl = window.cardUrl ? cardUrl(card.handle) : (location.origin + location.pathname.replace(/\/index\.html$/, '') + '#card/' + card.handle);
+  const cardUrl = getCardUrl(card.handle);
   new QRCode(qrEl, { text: cardUrl, width: 120, height: 120, colorDark: card.color, colorLight: '#ffffff' });
 }
 
@@ -808,7 +822,7 @@ function saveVCard() {
 //  SHARE MODAL
 // ═══════════════════════════════════════════════════════════════
 function openShareModal() {
-  const url = location.origin + location.pathname.replace(/\/index\.html$/, '') + '#card/' + currentCard.handle;
+  const url = getCardUrl(currentCard.handle);
   document.getElementById('share-url-input').value = url;
   const qrEl = document.getElementById('share-qr');
   qrEl.innerHTML = '';
