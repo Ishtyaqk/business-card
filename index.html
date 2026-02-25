@@ -1105,9 +1105,15 @@ async function deleteCurrentCard() {
 //  WEB NFC
 // ═══════════════════════════════════════════════════════════════
 function initNFC() {
-  // Only show NFC button if Web NFC is supported (Android Chrome)
-  if ('NDEFReader' in window) {
-    document.getElementById('nfc-row').style.display = 'block';
+  const isMobile = /Android/i.test(navigator.userAgent);
+  const nfcRow = document.getElementById('nfc-row');
+  if (isMobile) {
+    nfcRow.style.display = 'block';
+    // Update button label if NFC not supported on this Android browser
+    if (!('NDEFReader' in window)) {
+      document.getElementById('nfc-btn').style.opacity = '0.5';
+      document.getElementById('nfc-status').textContent = 'NFC requires Chrome or Brave browser';
+    }
   }
 }
 
