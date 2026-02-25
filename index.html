@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TapCard – Digital Business Cards</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+/* ─────────────────────────── TOKENS ─────────────────────────── */
+:root {
+  --ink:    #0e0e0e;
+  --paper:  #f4f0e8;
+  --card:   #ffffff;
+  --muted:  #7a7268;
+  --border: #e0dbd0;
+  --accent: #c84b2f;
+  --green:  #2a6b4a;
+  --radius: 10px;
+  --shadow: 0 24px 64px rgba(0,0,0,.13);
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body { font-family:'DM Sans',sans-serif; background:var(--paper); color:var(--ink); min-height:100vh; }
+a { color:inherit; }
+input,textarea,select { font-family:inherit; }
+
+/* ─── PAGES ─── */
+.page { display:none; min-height:100vh; }
+.page.active { display:flex; flex-direction:column; }
+
+/* ─── UTILITY ─── */
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:11px 22px; border:none; border-radius:var(--radius);
+  font-family:inherit; font-size:14px; font-weight:500; cursor:pointer;
+  transition:all .18s; white-space:nowrap; text-decoration:none;
+}
+.btn-dark   { background:var(--ink); color:#fff; }
+.btn-dark:hover  { background:#333; transform:translateY(-1px); }
+.btn-ghost  { background:transparent; color:var(--ink); border:1.5px solid var(--border); }
+.btn-ghost:hover { border-color:var(--ink); }
+.btn-accent { background:var(--accent); color:#fff; }
+.btn-accent:hover { background:#a83820; transform:translateY(-1px); }
+.btn-green  { background:var(--green); color:#fff; }
+.btn-green:hover { background:#1d5236; transform:translateY(-1px); }
+.btn:disabled { opacity:.45; pointer-events:none; }
+
+.tag {
+  display:inline-block; padding:5px 13px; border-radius:20px;
+  font-size:11px; font-weight:600; letter-spacing:1.8px; text-transform:uppercase;
+}
+
+/* ─── NAV ─── */
+.nav {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 40px; border-bottom:1px solid var(--border);
+  background:rgba(244,240,232,.9); backdrop-filter:blur(8px);
+  position:sticky; top:0; z-index:50;
+}
+.logo { font-family:'Instrument Serif',serif; font-size:22px; letter-spacing:-.5px; cursor:pointer; }
+.logo span { color:var(--accent); }
+.nav-actions { display:flex; gap:10px; }
+
+/* ─────────────────────────── LANDING ─────────────────────────── */
+#landing .hero {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  padding:80px 24px 40px;
+}
+#landing .hero h1 {
+  font-family:'Instrument Serif',serif;
+  font-size:clamp(44px,8vw,90px); line-height:1.0; letter-spacing:-2.5px;
+  max-width:720px; margin:20px 0 22px;
+}
+#landing .hero h1 em { color:var(--accent); font-style:italic; }
+#landing .hero p { font-size:17px; color:var(--muted); max-width:460px; line-height:1.75; margin-bottom:36px; }
+.hero-cta { display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+.pills { display:flex; justify-content:center; flex-wrap:wrap; gap:12px; padding:32px 20px 60px; }
+.pill {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:40px; padding:9px 18px;
+  display:flex; align-items:center; gap:8px;
+  font-size:13px; color:var(--muted);
+}
+.pill-dot { width:7px; height:7px; border-radius:50%; background:var(--accent); }
+
+/* setup banner */
+.setup-banner {
+  background:#fff3cd; border-bottom:1px solid #f0c36d;
+  padding:12px 24px; text-align:center; font-size:13px; color:#7a5800;
+}
+.setup-banner a { color:var(--accent); font-weight:600; cursor:pointer; text-decoration:underline; }
+
+/* ─────────────────────────── SETUP ─────────────────────────── */
+#setup .inner { max-width:560px; margin:0 auto; padding:48px 24px; }
+#setup h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; margin-bottom:8px; }
+#setup .sub { color:var(--muted); font-size:15px; margin-bottom:36px; line-height:1.6; }
+.steps { display:flex; flex-direction:column; gap:24px; margin-bottom:36px; }
+.step {
+  background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px 24px;
+}
+.step-num { font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin-bottom:6px; }
+.step h4 { font-size:15px; font-weight:600; margin-bottom:4px; }
+.step p  { font-size:13px; color:var(--muted); line-height:1.6; }
+.step code { background:var(--paper); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:12px; font-family:monospace; color:var(--ink); }
+.step a  { color:var(--accent); }
+.config-form { display:flex; flex-direction:column; gap:12px; }
+.config-form input {
+  padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius);
+  font-size:14px; color:var(--ink); background:var(--card); outline:none; transition:border-color .2s;
+}
+.config-form input:focus { border-color:var(--ink); }
+.sql-block {
+  background:#1a1a1a; color:#a5d6a7; font-family:monospace; font-size:12px;
+  border-radius:8px; padding:16px; margin-top:8px; overflow-x:auto; line-height:1.7;
+  white-space:pre; position:relative;
+}
+.copy-sql {
+  position:absolute; top:8px; right:8px;
+  background:#333; color:#ccc; border:none; border-radius:4px;
+  padding:4px 10px; font-size:11px; cursor:pointer;
+}
+.copy-sql:hover { background:#555; }
+
+/* ─────────────────────────── CREATE ─────────────────────────── */
+#create .inner { max-width:680px; margin:0 auto; padding:40px 24px; }
+.back-row { display:flex; align-items:center; gap:12px; margin-bottom:30px; }
+.page-header h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; margin-bottom:6px; }
+.page-header p  { color:var(--muted); font-size:14px; }
+.section-sep {
+  font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase;
+  color:var(--muted); margin:24px 0 10px; padding-top:20px;
+  border-top:1px solid var(--border);
+}
+.form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.full { grid-column:1/-1; }
+.field { display:flex; flex-direction:column; gap:5px; }
+.field label { font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:var(--muted); }
+.field input, .field textarea {
+  padding:11px 13px; border:1.5px solid var(--border); border-radius:var(--radius);
+  font-size:15px; color:var(--ink); background:var(--card); outline:none; transition:border-color .2s;
+}
+.field input:focus, .field textarea:focus { border-color:var(--ink); }
+.field textarea { resize:vertical; min-height:76px; }
+.avatar-row { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+.avi {
+  width:72px; height:72px; border-radius:50%;
+  background:var(--border); display:flex; align-items:center; justify-content:center;
+  font-size:28px; overflow:hidden; flex-shrink:0;
+}
+.avi img { width:100%; height:100%; object-fit:cover; }
+.color-swatches { display:flex; gap:10px; flex-wrap:wrap; margin-top:4px; }
+.swatch {
+  width:30px; height:30px; border-radius:50%; cursor:pointer;
+  border:3px solid transparent; transition:transform .15s;
+}
+.swatch:hover { transform:scale(1.15); }
+.swatch.on { border-color:var(--ink); outline:2px solid var(--paper); outline-offset:1px; }
+.handle-wrap { display:flex; }
+.handle-prefix {
+  padding:11px 13px; background:var(--paper); border:1.5px solid var(--border);
+  border-right:none; border-radius:var(--radius) 0 0 var(--radius);
+  font-size:13px; color:var(--muted); white-space:nowrap;
+}
+.handle-wrap input { border-radius:0 var(--radius) var(--radius) 0; }
+.handle-msg { font-size:12px; margin-top:4px; min-height:16px; }
+.form-footer { display:flex; gap:12px; margin-top:28px; }
+
+/* ─────────────────────────── DASHBOARD ─────────────────────────── */
+#dashboard .inner { max-width:840px; margin:0 auto; padding:40px 24px; }
+.dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
+.dash-header h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; }
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.card-thumb {
+  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  overflow:hidden; cursor:pointer; transition:all .2s;
+}
+.card-thumb:hover { transform:translateY(-4px); box-shadow:0 14px 40px rgba(0,0,0,.1); }
+.thumb-top { padding:22px 20px 18px; }
+.thumb-avi { width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:12px; overflow:hidden; }
+.thumb-avi img { width:100%; height:100%; object-fit:cover; }
+.thumb-name { font-family:'Instrument Serif',serif; font-size:19px; color:#fff; }
+.thumb-title { font-size:12px; color:rgba(255,255,255,.7); margin-top:2px; }
+.thumb-body { padding:12px 20px 14px; }
+.thumb-email { font-size:13px; color:var(--muted); }
+.thumb-actions { display:flex; gap:8px; padding:0 20px 16px; }
+.thumb-actions .btn { padding:7px 14px; font-size:12px; }
+.empty-state { grid-column:1/-1; text-align:center; padding:64px 20px; }
+.empty-state h3 { font-family:'Instrument Serif',serif; font-size:26px; margin-bottom:8px; }
+.empty-state p  { color:var(--muted); margin-bottom:24px; }
+
+/* ─────────────────────────── CARD VIEW ─────────────────────────── */
+#card-view {
+  align-items:center; justify-content:center; padding:24px;
+  background:linear-gradient(135deg,#f0ece0 0%,#e8e2d4 100%);
+}
+.bcard {
+  width:100%; max-width:400px;
+  border-radius:20px; overflow:hidden;
+  box-shadow:var(--shadow);
+  animation:slideUp .45s cubic-bezier(.22,1,.36,1);
+}
+@keyframes slideUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+.bcard-top { padding:44px 30px 32px; position:relative; overflow:hidden; }
+.bcard-top::before {
+  content:''; position:absolute; top:-50px; right:-50px;
+  width:180px; height:180px; border-radius:50%; background:rgba(255,255,255,.09);
+}
+.bcard-top::after {
+  content:''; position:absolute; bottom:-80px; left:-40px;
+  width:220px; height:220px; border-radius:50%; background:rgba(255,255,255,.06);
+}
+.bcard-avi {
+  width:76px; height:76px; border-radius:50%;
+  background:rgba(255,255,255,.2); margin-bottom:18px;
+  border:3px solid rgba(255,255,255,.35); position:relative; z-index:1;
+  display:flex; align-items:center; justify-content:center;
+  font-size:32px; overflow:hidden; color:#fff; font-family:'Instrument Serif',serif;
+}
+.bcard-avi img { width:100%; height:100%; object-fit:cover; }
+.bcard-name { font-family:'Instrument Serif',serif; font-size:30px; color:#fff; letter-spacing:-.5px; position:relative; z-index:1; }
+.bcard-title { font-size:14px; color:rgba(255,255,255,.72); position:relative; z-index:1; margin-top:2px; }
+.bcard-company { font-size:13px; color:rgba(255,255,255,.48); position:relative; z-index:1; margin-top:2px; }
+.bcard-body { background:var(--card); padding:26px 30px; }
+.bcard-bio { font-size:14px; color:var(--muted); line-height:1.65; margin-bottom:22px; padding-bottom:22px; border-bottom:1px solid var(--border); }
+.links { display:flex; flex-direction:column; gap:10px; margin-bottom:22px; }
+.clink {
+  display:flex; align-items:center; gap:12px;
+  text-decoration:none; color:var(--ink);
+  padding:11px 14px; border-radius:10px; background:var(--paper);
+  transition:all .18s;
+}
+.clink:hover { background:var(--border); transform:translateX(4px); }
+.clink-icon {
+  width:36px; height:36px; border-radius:8px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:15px;
+}
+.clink-lbl { font-size:11px; color:var(--muted); }
+.clink-val { font-size:13px; font-weight:500; }
+.card-actions { display:flex; gap:10px; margin-bottom:22px; }
+.card-actions .btn { flex:1; font-size:13px; padding:11px 14px; }
+.qr-wrap { text-align:center; padding-top:20px; border-top:1px solid var(--border); }
+.qr-label { font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:12px; }
+.qr-inner { display:flex; justify-content:center; }
+.qr-inner canvas, .qr-inner img { border-radius:8px; }
+.powered { text-align:center; font-size:11px; color:var(--muted); margin-top:14px; }
+.powered a { color:var(--accent); text-decoration:none; font-weight:600; }
+
+/* ─────────────────────────── MODAL ─────────────────────────── */
+.overlay {
+  position:fixed; inset:0; background:rgba(0,0,0,.48);
+  display:flex; align-items:center; justify-content:center;
+  z-index:200; padding:20px; animation:fadeIn .2s;
+}
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+.modal {
+  background:var(--card); border-radius:16px; padding:30px; max-width:400px; width:100%;
+  animation:slideUp .3s cubic-bezier(.22,1,.36,1); position:relative;
+}
+.modal h3 { font-family:'Instrument Serif',serif; font-size:26px; margin-bottom:6px; }
+.modal .sub { font-size:14px; color:var(--muted); margin-bottom:22px; }
+.modal-close { position:absolute; top:14px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--muted); }
+.share-row { display:flex; gap:8px; margin-bottom:18px; }
+.share-row input {
+  flex:1; padding:10px 13px; border:1.5px solid var(--border); border-radius:var(--radius);
+  font-size:12px; font-family:monospace; color:var(--muted); background:var(--paper); outline:none;
+}
+.share-qr-wrap { display:flex; justify-content:center; margin-bottom:18px; }
+.share-qr-wrap canvas, .share-qr-wrap img { border-radius:8px; }
+.modal-actions { display:flex; gap:10px; }
+.modal-actions .btn { flex:1; }
+
+/* ─── TOAST ─── */
+.toast {
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(100px);
+  background:var(--ink); color:#fff; padding:12px 22px; border-radius:40px;
+  font-size:13px; font-weight:500; z-index:999; transition:transform .3s cubic-bezier(.22,1,.36,1);
+  white-space:nowrap; pointer-events:none;
+}
+.toast.show { transform:translateX(-50%) translateY(0); }
+
+/* ─── SPINNER ─── */
+.spinner {
+  width:18px; height:18px; border:2.5px solid rgba(255,255,255,.3);
+  border-top-color:#fff; border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* ─── NOT FOUND ─── */
+#not-found { align-items:center; justify-content:center; text-align:center; padding:40px; }
+#not-found h2 { font-family:'Instrument Serif',serif; font-size:40px; margin-bottom:8px; }
+#not-found p  { color:var(--muted); margin-bottom:24px; }
+
+/* ─── RESPONSIVE ─── */
+@media(max-width:540px){
+  .nav { padding:14px 20px; }
+  .form-grid { grid-template-columns:1fr; }
+  .full { grid-column:1; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════ TOAST ══════════ -->
+<div class="toast" id="toast"></div>
+
+<!-- ══════════ LANDING ══════════ -->
+<div id="landing" class="page active">
+  <div id="setup-banner" class="setup-banner" style="display:none">
+    ⚠️ Supabase not configured — cards won't persist across devices. <a onclick="showPage('setup')">Set up now →</a>
+  </div>
+  <nav class="nav">
+    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
+    <div class="nav-actions">
+      <button class="btn btn-ghost" onclick="showPage('dashboard')">My Cards</button>
+      <button class="btn btn-accent" onclick="showPage('create')">Create Card</button>
+    </div>
+  </nav>
+  <div class="hero">
+    <div class="tag" style="background:var(--ink);color:var(--paper)">✦ No NFC Hardware Needed</div>
+    <h1>Your card,<br><em>one scan away</em></h1>
+    <p>Create a beautiful digital business card. Client scans your QR — they see your info, tap to call, email, or save your contact. Done.</p>
+    <div class="hero-cta">
+      <button class="btn btn-accent" style="font-size:15px;padding:13px 30px" onclick="showPage('create')">Create My Card →</button>
+      <button class="btn btn-ghost" onclick="loadDemoCard()">See a Demo</button>
+    </div>
+  </div>
+  <div class="pills">
+    <div class="pill"><div class="pill-dot"></div> Works on any smartphone</div>
+    <div class="pill"><div class="pill-dot"></div> QR code + shareable link</div>
+    <div class="pill"><div class="pill-dot"></div> Save to contacts (.vcf)</div>
+    <div class="pill"><div class="pill-dot"></div> Each rep gets own URL</div>
+    <div class="pill"><div class="pill-dot"></div> No app install needed</div>
+  </div>
+</div>
+
+<!-- ══════════ SETUP ══════════ -->
+<div id="setup" class="page">
+  <nav class="nav">
+    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
+  </nav>
+  <div class="inner" style="max-width:640px;margin:0 auto;padding:40px 24px">
+    <div class="back-row"><button class="btn btn-ghost" onclick="showPage('landing')" style="padding:8px 14px">← Back</button></div>
+    <h2>Connect Supabase</h2>
+    <p class="sub">Supabase is a free database. It stores your cards so they work on any device, anywhere. Setup takes ~2 minutes.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">Step 1</div>
+        <h4>Create a free Supabase project</h4>
+        <p>Go to <a href="https://supabase.com" target="_blank" style="color:var(--accent)">supabase.com</a> → Sign up → New Project. Takes 1 minute.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">Step 2</div>
+        <h4>Run this SQL to create the cards table</h4>
+        <p>In Supabase → SQL Editor → paste and run:</p>
+        <div class="sql-block" id="sql-block">create table if not exists cards (
+  id          bigint generated always as identity primary key,
+  handle      text unique not null,
+  color       text default '#0e0e0e',
+  avatar      text,
+  fname       text,
+  lname       text,
+  title       text,
+  company     text,
+  bio         text,
+  phone       text,
+  email       text,
+  website     text,
+  linkedin    text,
+  twitter     text,
+  created_at  timestamptz default now()
+);
+
+-- Allow anyone to read cards (public profiles)
+alter table cards enable row level security;
+create policy "Public read" on cards for select using (true);
+create policy "Public insert" on cards for insert with check (true);
+create policy "Public update" on cards for update using (true);
+create policy "Public delete" on cards for delete using (true);<button class="copy-sql" onclick="copySql()">Copy</button></div>
+      </div>
+      <div class="step">
+        <div class="step-num">Step 3</div>
+        <h4>Paste your Supabase credentials below</h4>
+        <p>Project Settings → API → copy <code>Project URL</code> and <code>anon public</code> key.</p>
+      </div>
+    </div>
+
+    <div class="config-form">
+      <input type="url" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co" autocomplete="off">
+      <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5c..." autocomplete="off">
+      <button class="btn btn-accent" style="width:100%" onclick="saveConfig()">Save & Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CREATE ══════════ -->
+<div id="create" class="page">
+  <nav class="nav">
+    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
+  </nav>
+  <div class="inner">
+    <div class="back-row">
+      <button class="btn btn-ghost" onclick="showPage('landing')" style="padding:8px 14px">← Back</button>
+    </div>
+    <div class="page-header">
+      <h2>Create Your Card</h2>
+      <p>Fill in your details — your card is ready instantly.</p>
+    </div>
+
+    <!-- Avatar -->
+    <div class="avatar-row" style="margin-top:24px">
+      <div class="avi" id="create-avi">😊</div>
+      <div>
+        <p style="font-size:14px;font-weight:500;margin-bottom:4px">Profile Photo</p>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Optional — adds a personal touch</p>
+        <input type="file" id="avi-input" accept="image/*" style="display:none" onchange="onAviChange(event)">
+        <button class="btn btn-ghost" style="padding:8px 14px;font-size:13px" onclick="document.getElementById('avi-input').click()">Upload Photo</button>
+      </div>
+    </div>
+
+    <!-- Basic info -->
+    <div class="form-grid" style="margin-top:16px">
+      <div class="field"><label>First Name *</label><input id="f-fname" placeholder="Alex"></div>
+      <div class="field"><label>Last Name *</label><input id="f-lname" placeholder="Rivera"></div>
+      <div class="field"><label>Job Title</label><input id="f-title" placeholder="Senior Sales Manager"></div>
+      <div class="field"><label>Company</label><input id="f-company" placeholder="Acme Corp"></div>
+      <div class="field full"><label>Bio / Tagline</label><textarea id="f-bio" placeholder="Helping businesses grow through tailored solutions. 7+ years in enterprise sales."></textarea></div>
+    </div>
+
+    <!-- Contact -->
+    <div class="section-sep">Contact Info</div>
+    <div class="form-grid">
+      <div class="field"><label>Phone</label><input id="f-phone" type="tel" placeholder="+1 555 000 0000"></div>
+      <div class="field"><label>Email *</label><input id="f-email" type="email" placeholder="alex@acme.com"></div>
+      <div class="field full"><label>Website</label><input id="f-website" type="url" placeholder="https://acme.com"></div>
+    </div>
+
+    <!-- Socials -->
+    <div class="section-sep">Socials</div>
+    <div class="form-grid">
+      <div class="field"><label>LinkedIn URL</label><input id="f-linkedin" type="url" placeholder="https://linkedin.com/in/alex"></div>
+      <div class="field"><label>Twitter / X</label><input id="f-twitter" type="url" placeholder="https://x.com/alex"></div>
+    </div>
+
+    <!-- Color -->
+    <div class="section-sep">Card Color</div>
+    <div class="color-swatches" id="swatches">
+      <div class="swatch on"  data-c="#0e0e0e" style="background:#0e0e0e" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#c84b2f" style="background:#c84b2f" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#1a3a5c" style="background:#1a3a5c" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#2a6b4a" style="background:#2a6b4a" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#6b4fa0" style="background:#6b4fa0" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#b5460e" style="background:#b5460e" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#1b4f72" style="background:#1b4f72" onclick="pickColor(this)"></div>
+      <div class="swatch"     data-c="#333333" style="background:#333333" onclick="pickColor(this)"></div>
+    </div>
+
+    <!-- Handle -->
+    <div class="section-sep">Card Handle *</div>
+    <div class="field">
+      <label>Your unique link</label>
+      <div class="handle-wrap">
+        <span class="handle-prefix" id="handle-base">tapcard.app/u/</span>
+        <input id="f-handle" placeholder="alexrivera" oninput="onHandleInput(this)" style="border-left:none;border-radius:0 var(--radius) var(--radius) 0">
+      </div>
+      <div class="handle-msg" id="handle-msg"></div>
+    </div>
+
+    <div class="form-footer">
+      <button class="btn btn-accent" id="create-btn" style="flex:1;font-size:15px;padding:13px" onclick="createCard()">
+        Generate My Card ✦
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ DASHBOARD ══════════ -->
+<div id="dashboard" class="page">
+  <nav class="nav">
+    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
+    <div class="nav-actions">
+      <button class="btn btn-accent" onclick="showPage('create')">+ New Card</button>
+    </div>
+  </nav>
+  <div class="inner">
+    <div class="dash-header">
+      <h2>My Cards</h2>
+      <button class="btn btn-ghost" onclick="showPage('landing')" style="padding:8px 14px">← Home</button>
+    </div>
+    <div class="cards-grid" id="cards-grid">
+      <div style="color:var(--muted);padding:40px;text-align:center;grid-column:1/-1">Loading…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ CARD VIEW ══════════ -->
+<div id="card-view" class="page">
+  <div class="bcard" id="bcard">
+    <div class="bcard-top" id="bcard-top">
+      <div class="bcard-avi" id="bcard-avi">😊</div>
+      <div class="bcard-name" id="bcard-name"></div>
+      <div class="bcard-title" id="bcard-title"></div>
+      <div class="bcard-company" id="bcard-company"></div>
+    </div>
+    <div class="bcard-body">
+      <div class="bcard-bio" id="bcard-bio"></div>
+      <div class="links" id="bcard-links"></div>
+      <div class="card-actions">
+        <button class="btn btn-dark" onclick="saveVCard()">💾 Save Contact</button>
+        <button class="btn btn-ghost" onclick="openShareModal()">🔗 Share</button>
+      </div>
+      <div class="qr-wrap">
+        <div class="qr-label">Scan to share this card</div>
+        <div class="qr-inner" id="bcard-qr"></div>
+      </div>
+      <div class="powered">Made with <a onclick="showPage('landing');return false">TapCard</a> · <a onclick="showPage('create');return false">Create yours →</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ NOT FOUND ══════════ -->
+<div id="not-found" class="page">
+  <nav class="nav" style="width:100%">
+    <div class="logo" onclick="showPage('landing')">Tap<span>Card</span></div>
+  </nav>
+  <h2>404 — Card Not Found</h2>
+  <p>This handle doesn't exist yet.</p>
+  <button class="btn btn-accent" onclick="showPage('create')">Create a Card</button>
+</div>
+
+<!-- ══════════ SHARE MODAL ══════════ -->
+<div id="share-modal" style="display:none">
+  <div class="overlay" onclick="if(event.target.classList.contains('overlay'))closeShareModal()">
+    <div class="modal">
+      <button class="modal-close" onclick="closeShareModal()">✕</button>
+      <h3>Share Your Card</h3>
+      <div class="sub">Show the QR code or send the link.</div>
+      <div class="share-row">
+        <input type="text" id="share-url-input" readonly>
+        <button class="btn btn-dark" onclick="copyShareLink()" style="padding:10px 16px" id="copy-btn">Copy</button>
+      </div>
+      <div class="share-qr-wrap" id="share-qr"></div>
+      <div class="modal-actions">
+        <button class="btn btn-accent" onclick="downloadQR()" style="flex:1">⬇ Download QR</button>
+        <button class="btn btn-ghost" onclick="closeShareModal()">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG — Supabase credentials (persisted in localStorage)
+// ═══════════════════════════════════════════════════════════════
+const STORAGE_PREFIX = 'tc_';
+
+function getCfg() {
+  return {
+    url: localStorage.getItem('tc_sb_url') || '',
+    key: localStorage.getItem('tc_sb_key') || ''
+  };
+}
+
+let supabase = null;
+
+function initSupabase() {
+  const { url, key } = getCfg();
+  if (url && key) {
+    try {
+      supabase = window.supabase.createClient(url, key);
+      return true;
+    } catch(e) { return false; }
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let currentCard = null;
+let selectedColor = '#0e0e0e';
+let avatarDataUrl = null;
+let localCards = JSON.parse(localStorage.getItem('tc_local_cards') || '[]'); // fallback
+let handleCheckTimer = null;
+
+// ═══════════════════════════════════════════════════════════════
+//  ROUTING — URL hash → #card/<handle>
+// ═══════════════════════════════════════════════════════════════
+async function routeHash() {
+  const hash = location.hash;
+  if (!hash.startsWith('#card/')) return false;
+  const handle = hash.replace('#card/','').trim();
+  if (!handle) return false;
+
+  const card = await fetchCardByHandle(handle);
+  if (card) { renderCard(card); showPage('card-view', false); }
+  else       { showPage('not-found', false); }
+  return true;
+}
+
+window.addEventListener('hashchange', routeHash);
+
+// ═══════════════════════════════════════════════════════════════
+//  SUPABASE SETUP
+// ═══════════════════════════════════════════════════════════════
+function saveConfig() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) { toast('Please enter both URL and key.'); return; }
+  localStorage.setItem('tc_sb_url', url);
+  localStorage.setItem('tc_sb_key', key);
+  if (initSupabase()) {
+    toast('✓ Connected to Supabase!');
+    document.getElementById('setup-banner').style.display = 'none';
+    showPage('create');
+  } else {
+    toast('Could not connect — check credentials.');
+  }
+}
+
+function copySql() {
+  const text = document.getElementById('sql-block').innerText.replace('Copy','').trim();
+  navigator.clipboard.writeText(text);
+  toast('SQL copied!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DATABASE HELPERS
+// ═══════════════════════════════════════════════════════════════
+async function fetchCardByHandle(handle) {
+  // Try Supabase first
+  if (supabase) {
+    const { data } = await supabase.from('cards').select('*').eq('handle', handle).single();
+    if (data) return data;
+  }
+  // Fallback: localStorage
+  return localCards.find(c => c.handle === handle) || null;
+}
+
+async function checkHandleTaken(handle) {
+  if (supabase) {
+    const { data } = await supabase.from('cards').select('id').eq('handle', handle).single();
+    return !!data;
+  }
+  return localCards.some(c => c.handle === handle);
+}
+
+async function saveCard(card) {
+  if (supabase) {
+    const { data, error } = await supabase.from('cards').insert(card).select().single();
+    if (error) throw error;
+    return data;
+  }
+  // Fallback
+  card.id = Date.now();
+  localCards.push(card);
+  localStorage.setItem('tc_local_cards', JSON.stringify(localCards));
+  return card;
+}
+
+async function fetchMyCards() {
+  // In a real multi-user setup you'd filter by user_id.
+  // For now: if Supabase connected, fetch all. Otherwise localStorage.
+  if (supabase) {
+    const { data } = await supabase.from('cards').select('*').order('created_at',{ascending:false});
+    return data || [];
+  }
+  return localCards;
+}
+
+async function deleteCardById(id) {
+  if (supabase) {
+    await supabase.from('cards').delete().eq('id', id);
+  } else {
+    localCards = localCards.filter(c => c.id !== id);
+    localStorage.setItem('tc_local_cards', JSON.stringify(localCards));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════════════════════════════
+function showPage(id, updateHash = true) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (updateHash && id !== 'card-view') history.pushState(null, '', location.pathname);
+  if (id === 'dashboard') loadDashboard();
+  if (id === 'create') resetCreateForm();
+  if (id === 'landing') checkSetupBanner();
+}
+
+function checkSetupBanner() {
+  const banner = document.getElementById('setup-banner');
+  banner.style.display = supabase ? 'none' : 'block';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CREATE CARD
+// ═══════════════════════════════════════════════════════════════
+function resetCreateForm() {
+  ['f-fname','f-lname','f-title','f-company','f-bio','f-phone','f-email','f-website','f-linkedin','f-twitter','f-handle']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  selectedColor = '#0e0e0e';
+  avatarDataUrl = null;
+  document.getElementById('create-avi').innerHTML = '😊';
+  document.getElementById('create-avi').style.fontSize = '28px';
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+  document.querySelector('.swatch[data-c="#0e0e0e"]').classList.add('on');
+  document.getElementById('handle-msg').textContent = '';
+  // Update handle prefix to use actual origin
+  document.getElementById('handle-base').textContent = location.origin + '/u/';
+}
+
+function onAviChange(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    avatarDataUrl = ev.target.result;
+    const el = document.getElementById('create-avi');
+    el.innerHTML = `<img src="${avatarDataUrl}" alt="photo">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function pickColor(el) {
+  document.querySelectorAll('.swatch').forEach(s => s.classList.remove('on'));
+  el.classList.add('on');
+  selectedColor = el.dataset.c;
+}
+
+function onHandleInput(input) {
+  input.value = input.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const msg = document.getElementById('handle-msg');
+  msg.textContent = '';
+  clearTimeout(handleCheckTimer);
+  if (!input.value) return;
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'Checking…';
+  handleCheckTimer = setTimeout(async () => {
+    const taken = await checkHandleTaken(input.value);
+    if (taken) {
+      msg.textContent = '⚠ Handle taken — try another.';
+      msg.style.color = 'var(--accent)';
+    } else {
+      msg.textContent = '✓ Available!';
+      msg.style.color = 'var(--green)';
+    }
+  }, 450);
+}
+
+async function createCard() {
+  const btn = document.getElementById('create-btn');
+  const fname = document.getElementById('f-fname').value.trim();
+  const lname  = document.getElementById('f-lname').value.trim();
+  const email  = document.getElementById('f-email').value.trim();
+  const handle = document.getElementById('f-handle').value.trim();
+
+  if (!fname || !email || !handle) { toast('Fill in First Name, Email and Handle.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Saving…';
+
+  try {
+    const card = {
+      handle, color: selectedColor, avatar: avatarDataUrl,
+      fname, lname,
+      title:   document.getElementById('f-title').value.trim(),
+      company: document.getElementById('f-company').value.trim(),
+      bio:     document.getElementById('f-bio').value.trim(),
+      phone:   document.getElementById('f-phone').value.trim(),
+      email,
+      website:  document.getElementById('f-website').value.trim(),
+      linkedin: document.getElementById('f-linkedin').value.trim(),
+      twitter:  document.getElementById('f-twitter').value.trim(),
+    };
+
+    const saved = await saveCard(card);
+    currentCard = saved;
+    renderCard(saved);
+    history.replaceState(null, '', `#card/${handle}`);
+    showPage('card-view', false);
+    toast('✓ Card created!');
+  } catch(err) {
+    toast('Error: ' + (err.message || 'Could not save card.'));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Generate My Card ✦';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER CARD
+// ═══════════════════════════════════════════════════════════════
+function renderCard(card) {
+  currentCard = card;
+
+  // Header
+  document.getElementById('bcard-top').style.background = card.color;
+  document.getElementById('bcard-name').textContent = `${card.fname||''} ${card.lname||''}`.trim();
+  document.getElementById('bcard-title').textContent = card.title || '';
+  document.getElementById('bcard-company').textContent = card.company || '';
+
+  // Avatar
+  const avi = document.getElementById('bcard-avi');
+  if (card.avatar) {
+    avi.innerHTML = `<img src="${card.avatar}" alt="photo">`;
+  } else {
+    avi.innerHTML = (card.fname?.[0]||'').toUpperCase() || '😊';
+    avi.style.fontSize = '32px';
+    avi.style.color = '#fff';
+  }
+
+  // Bio
+  const bioEl = document.getElementById('bcard-bio');
+  bioEl.textContent = card.bio || '';
+  bioEl.style.display = card.bio ? '' : 'none';
+
+  // Links
+  const linksEl = document.getElementById('bcard-links');
+  linksEl.innerHTML = '';
+  const link = (icon, label, val, href, bg) => {
+    if (!val) return;
+    linksEl.innerHTML += `
+      <a class="clink" href="${href}" target="_blank" rel="noopener">
+        <div class="clink-icon" style="background:${bg}">${icon}</div>
+        <div><div class="clink-lbl">${label}</div><div class="clink-val">${val}</div></div>
+      </a>`;
+  };
+  link('📞','Phone',card.phone,`tel:${card.phone}`,'#e8f5e9');
+  link('✉️','Email',card.email,`mailto:${card.email}`,'#e3f2fd');
+  link('🌐','Website',card.website?.replace(/https?:\/\//,''),card.website,'#fff8e1');
+  link('💼','LinkedIn',card.linkedin?'View Profile':null,card.linkedin,'#e8eaf6');
+  link('𝕏','Twitter/X',card.twitter?'View Profile':null,card.twitter,'#e0f7fa');
+
+  // QR
+  const qrEl = document.getElementById('bcard-qr');
+  qrEl.innerHTML = '';
+  const cardUrl = `${location.origin}${location.pathname}#card/${card.handle}`;
+  new QRCode(qrEl, { text: cardUrl, width: 120, height: 120, colorDark: card.color, colorLight: '#ffffff' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SAVE vCARD
+// ═══════════════════════════════════════════════════════════════
+function saveVCard() {
+  const c = currentCard;
+  const lines = [
+    'BEGIN:VCARD','VERSION:3.0',
+    `N:${c.lname||''};${c.fname||''}`,
+    `FN:${(c.fname||'')} ${(c.lname||'')}`.trim(),
+    c.title    ? `TITLE:${c.title}`   : '',
+    c.company  ? `ORG:${c.company}`   : '',
+    c.phone    ? `TEL:${c.phone}`     : '',
+    c.email    ? `EMAIL:${c.email}`   : '',
+    c.website  ? `URL:${c.website}`   : '',
+    c.linkedin ? `X-SOCIALPROFILE;type=linkedin:${c.linkedin}` : '',
+    'END:VCARD'
+  ].filter(Boolean).join('\r\n');
+
+  const blob = new Blob([lines], { type:'text/vcard' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${c.fname}_${c.lname}.vcf`;
+  a.click();
+  toast('Contact file downloaded!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SHARE MODAL
+// ═══════════════════════════════════════════════════════════════
+function openShareModal() {
+  const url = `${location.origin}${location.pathname}#card/${currentCard.handle}`;
+  document.getElementById('share-url-input').value = url;
+  const qrEl = document.getElementById('share-qr');
+  qrEl.innerHTML = '';
+  new QRCode(qrEl, { text: url, width: 200, height: 200, colorDark: currentCard.color, colorLight:'#ffffff' });
+  document.getElementById('share-modal').style.display = 'block';
+}
+
+function closeShareModal() { document.getElementById('share-modal').style.display = 'none'; }
+
+function copyShareLink() {
+  navigator.clipboard.writeText(document.getElementById('share-url-input').value);
+  document.getElementById('copy-btn').textContent = 'Copied!';
+  setTimeout(() => document.getElementById('copy-btn').textContent = 'Copy', 2000);
+}
+
+function downloadQR() {
+  const canvas = document.querySelector('#share-qr canvas');
+  if (!canvas) return;
+  const a = document.createElement('a');
+  a.download = `${currentCard.handle}-qr.png`;
+  a.href = canvas.toDataURL();
+  a.click();
+  toast('QR downloaded!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const grid = document.getElementById('cards-grid');
+  grid.innerHTML = '<div style="color:var(--muted);padding:40px;text-align:center;grid-column:1/-1">Loading…</div>';
+  const cards = await fetchMyCards();
+  if (!cards.length) {
+    grid.innerHTML = `<div class="empty-state"><h3>No cards yet</h3><p>Create your first digital business card.</p><button class="btn btn-accent" onclick="showPage('create')">+ Create Card</button></div>`;
+    return;
+  }
+  grid.innerHTML = cards.map(c => `
+    <div class="card-thumb" onclick='viewCardObj(${JSON.stringify(c)})'>
+      <div class="thumb-top" style="background:${c.color}">
+        <div class="thumb-avi">${c.avatar ? `<img src="${c.avatar}" alt="">` : (c.fname?.[0]||'').toUpperCase()}</div>
+        <div class="thumb-name">${c.fname||''} ${c.lname||''}</div>
+        <div class="thumb-title">${c.title||''}</div>
+      </div>
+      <div class="thumb-body"><div class="thumb-email">${c.email||''}</div></div>
+      <div class="thumb-actions">
+        <button class="btn btn-ghost" onclick="event.stopPropagation();shareCardObj(${JSON.stringify(c)})">Share</button>
+        <button class="btn btn-ghost" style="color:var(--accent)" onclick="event.stopPropagation();confirmDelete(${c.id||`'`+c.handle+`'`})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+function viewCardObj(card) {
+  renderCard(card);
+  history.pushState(null, '', `#card/${card.handle}`);
+  showPage('card-view', false);
+}
+
+function shareCardObj(card) {
+  currentCard = card;
+  openShareModal();
+}
+
+async function confirmDelete(id) {
+  if (!confirm('Delete this card?')) return;
+  await deleteCardById(id);
+  toast('Card deleted.');
+  loadDashboard();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DEMO
+// ═══════════════════════════════════════════════════════════════
+function loadDemoCard() {
+  renderCard({
+    handle:'demo', color:'#1a3a5c', avatar:null,
+    fname:'Alex', lname:'Rivera',
+    title:'Senior Sales Manager', company:'Acme Corp',
+    bio:'Helping businesses grow through tailored solutions. 7+ years in enterprise sales across SaaS and fintech.',
+    phone:'+1 555 012 3456', email:'alex@acme.com',
+    website:'https://acme.com', linkedin:'https://linkedin.com/in/alexrivera', twitter:''
+  });
+  showPage('card-view');
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════════════
+(async function boot() {
+  // Pre-fill setup form if creds saved
+  const { url, key } = getCfg();
+  if (url) document.getElementById('sb-url').value = url;
+  if (key) document.getElementById('sb-key').value = key;
+
+  initSupabase();
+  checkSetupBanner();
+
+  // Check for deep-link
+  const wasRoute = await routeHash();
+  if (!wasRoute) showPage('landing');
+})();
+</script>
+</body>
+</html>
