@@ -324,7 +324,6 @@ input,textarea,select { font-family:inherit; }
     <p>Create a beautiful digital business card. Client scans your QR — they see your info, tap to call, email, or save your contact. Done.</p>
     <div class="hero-cta">
       <button class="btn btn-accent" style="font-size:15px;padding:13px 30px" onclick="showPage('create')">Create My Card →</button>
-      <button class="btn btn-ghost" onclick="loadDemoCard()">See a Demo</button>
     </div>
   </div>
   <div class="pills">
@@ -896,20 +895,7 @@ async function confirmDelete(id) {
   loadDashboard();
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  DEMO
-// ═══════════════════════════════════════════════════════════════
-function loadDemoCard() {
-  renderCard({
-    handle:'demo', color:'#1a3a5c', avatar:null,
-    fname:'Alex', lname:'Rivera',
-    title:'Senior Sales Manager', company:'Acme Corp',
-    bio:'Helping businesses grow through tailored solutions. 7+ years in enterprise sales across SaaS and fintech.',
-    phone:'+1 555 012 3456', email:'alex@acme.com',
-    website:'https://acme.com', linkedin:'https://linkedin.com/in/alexrivera', twitter:''
-  });
-  showPage('card-view');
-}
+
 
 // ═══════════════════════════════════════════════════════════════
 //  TOAST
