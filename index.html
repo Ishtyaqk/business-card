@@ -500,6 +500,17 @@ input,textarea,select { font-family:inherit; }
       <h3>Edit Card</h3>
       <div class="sub">Changes save instantly to Supabase.</div>
 
+      <!-- Photo upload -->
+      <div class="avatar-row" style="margin-bottom:20px">
+        <div class="avi" id="edit-avi-preview" style="width:64px;height:64px;font-size:24px">😊</div>
+        <div>
+          <p style="font-size:14px;font-weight:500;margin-bottom:4px">Profile Photo</p>
+          <p style="font-size:12px;color:var(--muted);margin-bottom:8px">Upload a new photo to replace current</p>
+          <input type="file" id="edit-avi-input" accept="image/*" style="display:none" onchange="onEditAviChange(event)">
+          <button class="btn btn-ghost" style="padding:7px 14px;font-size:12px" onclick="document.getElementById('edit-avi-input').click()">Change Photo</button>
+        </div>
+      </div>
+
       <div class="form-grid" style="margin-bottom:12px">
         <div class="field"><label>First Name</label><input id="e-fname"></div>
         <div class="field"><label>Last Name</label><input id="e-lname"></div>
@@ -773,7 +784,7 @@ async function createCard() {
       website:  document.getElementById('f-website').value.trim(),
       linkedin: document.getElementById('f-linkedin').value.trim(),
       twitter:  document.getElementById('f-twitter').value.trim(),
-      emp_id:   await generateEmpId(),
+      emp_id:   await generateEmpIdIfEligible(document.getElementById('f-title').value.trim()),
     };
 
     const saved = await saveCard(card);
@@ -1019,9 +1030,31 @@ window.addEventListener('popstate', async () => {
 //  EDIT CARD
 // ═══════════════════════════════════════════════════════════════
 let editColor = '#0e0e0e';
+let editAvatarDataUrl = null; // null means no change
+
+function onEditAviChange(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    editAvatarDataUrl = ev.target.result;
+    const el = document.getElementById('edit-avi-preview');
+    el.innerHTML = `<img src="${editAvatarDataUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  };
+  reader.readAsDataURL(file);
+}
 
 function openEditModal() {
   const c = currentCard;
+  editAvatarDataUrl = null; // reset on open
+  // Show current avatar in preview
+  const editAviEl = document.getElementById('edit-avi-preview');
+  if (c.avatar) {
+    editAviEl.innerHTML = `<img src="${c.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+  } else {
+    editAviEl.innerHTML = (c.fname?.[0] || '😊').toUpperCase();
+    editAviEl.style.fontSize = '24px';
+  }
+
   document.getElementById('e-fname').value   = c.fname    || '';
   document.getElementById('e-lname').value   = c.lname    || '';
   document.getElementById('e-title').value   = c.title    || '';
@@ -1057,6 +1090,7 @@ async function saveEdit() {
   btn.innerHTML = '<div class="spinner"></div> Saving…';
 
   const updates = {
+    ...(editAvatarDataUrl ? { avatar: editAvatarDataUrl } : {}),
     fname:    document.getElementById('e-fname').value.trim(),
     lname:    document.getElementById('e-lname').value.trim(),
     title:    document.getElementById('e-title').value.trim(),
@@ -1204,10 +1238,13 @@ async function shareViaNFC() {
 // ═══════════════════════════════════════════════════════════════
 //  EMPLOYEE ID — auto-assign MIRAI11, MIRAI12, etc.
 // ═══════════════════════════════════════════════════════════════
-async function generateEmpId() {
+async function generateEmpIdIfEligible(title) {
+  // Only assign MIRAI IDs to AI/ML roles
+  const isAIML = /\bai\b|\bml\b|machine.?learning|artificial.?intelligence/i.test(title);
+  if (!isAIML) return null;
+
   try {
     if (sbClient) {
-      // Get the highest existing emp_id number
       const { data } = await sbClient
         .from('cards')
         .select('emp_id')
@@ -1216,13 +1253,11 @@ async function generateEmpId() {
         .limit(1);
 
       if (data && data.length > 0 && data[0].emp_id) {
-        // Extract number from e.g. "MIRAI11" → 11, increment
         const num = parseInt(data[0].emp_id.replace('MIRAI', ''), 10);
         if (!isNaN(num)) return 'MIRAI' + (num + 1);
       }
-      return 'MIRAI11'; // first card
+      return 'MIRAI11'; // first AI/ML card
     } else {
-      // localStorage fallback
       const nums = localCards
         .map(c => c.emp_id ? parseInt(c.emp_id.replace('MIRAI',''), 10) : 0)
         .filter(n => !isNaN(n));
@@ -1230,7 +1265,7 @@ async function generateEmpId() {
       return 'MIRAI' + (max + 1);
     }
   } catch(e) {
-    return 'MIRAI' + Date.now().toString().slice(-4); // fallback
+    return null;
   }
 }
 
