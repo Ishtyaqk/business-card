@@ -174,20 +174,21 @@ input,textarea,select { font-family:inherit; }
 #dashboard .inner { max-width:840px; margin:0 auto; padding:40px 24px; }
 .dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
 .dash-header h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; }
-.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:16px; }
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px; }
 .card-thumb {
-  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
   overflow:hidden; cursor:pointer; transition:all .2s;
+  display:flex; flex-direction:row; align-items:stretch;
 }
-.card-thumb:hover { transform:translateY(-4px); box-shadow:0 14px 40px rgba(0,0,0,.1); }
-.thumb-top { padding:22px 20px 18px; }
-.thumb-avi { width:42px; height:42px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:12px; overflow:hidden; }
+.card-thumb:hover { transform:translateY(-3px); box-shadow:0 14px 40px rgba(0,0,0,.1); }
+.thumb-top { padding:24px 20px; display:flex; flex-direction:column; justify-content:center; align-items:center; min-width:130px; flex-shrink:0; }
+.thumb-avi { width:64px; height:64px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:26px; margin-bottom:12px; overflow:hidden; border:2px solid rgba(255,255,255,.3); }
 .thumb-avi img { width:100%; height:100%; object-fit:cover; }
-.thumb-name { font-family:'Instrument Serif',serif; font-size:19px; color:#fff; }
-.thumb-title { font-size:12px; color:rgba(255,255,255,.7); margin-top:2px; }
-.thumb-body { padding:12px 20px 14px; }
-.thumb-email { font-size:13px; color:var(--muted); }
-.thumb-actions { display:flex; gap:8px; padding:0 20px 16px; }
+.thumb-name { font-family:'Instrument Serif',serif; font-size:17px; color:#fff; text-align:center; line-height:1.2; }
+.thumb-title { font-size:11px; color:rgba(255,255,255,.7); margin-top:3px; text-align:center; }
+.thumb-body { padding:20px 16px; display:flex; flex-direction:column; justify-content:center; flex:1; border-left:1px solid var(--border); }
+.thumb-email { font-size:13px; color:var(--muted); margin-bottom:12px; word-break:break-all; }
+.thumb-actions { display:flex; gap:8px; }
 .thumb-actions .btn { padding:7px 14px; font-size:12px; }
 .empty-state { grid-column:1/-1; text-align:center; padding:64px 20px; }
 .empty-state h3 { font-family:'Instrument Serif',serif; font-size:26px; margin-bottom:8px; }
@@ -993,13 +994,9 @@ function isMine(handle) {
 //  BACK NAVIGATION
 // ═══════════════════════════════════════════════════════════════
 function goBack() {
-  // If there's real history, go back, but also listen for popstate to re-render
-  if (document.referrer && document.referrer.includes(location.hostname)) {
-    history.back();
-  } else {
-    history.pushState(null, '', location.pathname);
-    showPage('landing');
-  }
+  // Always go to dashboard — it shows all cards and has its own Home button
+  history.pushState(null, '', location.pathname);
+  showPage('dashboard');
 }
 // Re-render page when browser back/forward is used
 window.addEventListener('popstate', async () => {
@@ -1105,15 +1102,29 @@ async function deleteCurrentCard() {
 //  WEB NFC
 // ═══════════════════════════════════════════════════════════════
 function initNFC() {
-  const isMobile = /Android/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  const isBrave = (navigator.brave && navigator.brave.isBrave) || /Brave/i.test(navigator.userAgent);
   const nfcRow = document.getElementById('nfc-row');
-  if (isMobile) {
-    nfcRow.style.display = 'block';
-    // Update button label if NFC not supported on this Android browser
-    if (!('NDEFReader' in window)) {
-      document.getElementById('nfc-btn').style.opacity = '0.5';
-      document.getElementById('nfc-status').textContent = 'NFC requires Chrome or Brave browser';
-    }
+  const nfcStatus = document.getElementById('nfc-status');
+  const nfcBtn = document.getElementById('nfc-btn');
+
+  if (!isAndroid) return; // hide on desktop/iPhone
+
+  nfcRow.style.display = 'block';
+
+  if ('NDEFReader' in window) {
+    // Fully supported — all good
+    return;
+  }
+
+  // NFC not available
+  nfcBtn.style.opacity = '0.6';
+  nfcBtn.disabled = true;
+
+  if (isBrave) {
+    nfcStatus.innerHTML = '⚠️ Brave blocks NFC by default.<br>Go to <strong>brave://flags</strong> → search <strong>Web NFC</strong> → Enable → Relaunch.';
+  } else {
+    nfcStatus.textContent = 'NFC not supported in this browser. Try Chrome.';
   }
 }
 
