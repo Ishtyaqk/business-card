@@ -174,22 +174,23 @@ input,textarea,select { font-family:inherit; }
 #dashboard .inner { max-width:840px; margin:0 auto; padding:40px 24px; }
 .dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
 .dash-header h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; }
-.cards-grid { display:flex; flex-wrap:wrap; gap:16px; }
+.cards-grid { display:flex; flex-wrap:wrap; gap:20px; }
 .card-thumb {
-  background:var(--card); border:1px solid var(--border); border-radius:14px;
+  background:var(--card); border:1px solid var(--border); border-radius:16px;
   overflow:hidden; cursor:pointer; transition:all .2s;
-  display:flex; flex-direction:column; width:200px; flex-shrink:0;
+  display:flex; flex-direction:column; width:260px; flex-shrink:0;
 }
 .card-thumb:hover { transform:translateY(-4px); box-shadow:0 14px 40px rgba(0,0,0,.1); }
-.thumb-top { padding:20px 16px 14px; display:flex; flex-direction:column; align-items:center; }
-.thumb-avi { width:56px; height:56px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:22px; margin-bottom:10px; overflow:hidden; border:2px solid rgba(255,255,255,.3); flex-shrink:0; }
+.thumb-top { padding:28px 20px 18px; display:flex; flex-direction:column; align-items:center; }
+.thumb-avi { width:72px; height:72px; border-radius:50%; background:rgba(255,255,255,.25); display:flex; align-items:center; justify-content:center; font-size:28px; margin-bottom:12px; overflow:hidden; border:2.5px solid rgba(255,255,255,.35); flex-shrink:0; }
 .thumb-avi img { width:100%; height:100%; object-fit:cover; }
-.thumb-name { font-family:'Instrument Serif',serif; font-size:16px; color:#fff; text-align:center; line-height:1.2; }
-.thumb-title { font-size:11px; color:rgba(255,255,255,.7); margin-top:3px; text-align:center; }
-.thumb-body { padding:10px 16px 6px; }
-.thumb-email { font-size:12px; color:var(--muted); margin-bottom:10px; word-break:break-all; }
-.thumb-actions { display:flex; gap:6px; padding:0 16px 14px; }
-.thumb-actions .btn { padding:6px 12px; font-size:11px; flex:1; justify-content:center; }
+.thumb-name { font-family:'Instrument Serif',serif; font-size:19px; color:#fff; text-align:center; line-height:1.2; }
+.thumb-title { font-size:12px; color:rgba(255,255,255,.7); margin-top:4px; text-align:center; }
+.thumb-empid { font-size:11px; color:rgba(255,255,255,.5); margin-top:4px; text-align:center; font-weight:600; letter-spacing:1px; }
+.thumb-body { padding:14px 18px 8px; }
+.thumb-email { font-size:13px; color:var(--muted); margin-bottom:12px; word-break:break-all; }
+.thumb-actions { display:flex; gap:8px; padding:0 18px 16px; }
+.thumb-actions .btn { padding:8px 14px; font-size:12px; flex:1; justify-content:center; }
 .empty-state { grid-column:1/-1; text-align:center; padding:64px 20px; }
 .empty-state h3 { font-family:'Instrument Serif',serif; font-size:26px; margin-bottom:8px; }
 .empty-state p  { color:var(--muted); margin-bottom:24px; }
@@ -453,6 +454,7 @@ input,textarea,select { font-family:inherit; }
       <div class="bcard-name" id="bcard-name"></div>
       <div class="bcard-title" id="bcard-title"></div>
       <div class="bcard-company" id="bcard-company"></div>
+      <div id="bcard-empid" style="font-size:11px;color:rgba(255,255,255,.45);margin-top:6px;letter-spacing:1.5px;font-weight:600;position:relative;z-index:1"></div>
     </div>
     <div class="bcard-body">
       <div class="bcard-bio" id="bcard-bio"></div>
@@ -769,6 +771,7 @@ async function createCard() {
       website:  document.getElementById('f-website').value.trim(),
       linkedin: document.getElementById('f-linkedin').value.trim(),
       twitter:  document.getElementById('f-twitter').value.trim(),
+      emp_id:   await generateEmpId(),
     };
 
     const saved = await saveCard(card);
@@ -811,6 +814,7 @@ function renderCard(card) {
   document.getElementById('bcard-name').textContent = `${card.fname||''} ${card.lname||''}`.trim();
   document.getElementById('bcard-title').textContent = card.title || '';
   document.getElementById('bcard-company').textContent = card.company || '';
+  document.getElementById('bcard-empid').textContent = card.emp_id || '';
 
   // Avatar
   const avi = document.getElementById('bcard-avi');
@@ -931,6 +935,7 @@ async function loadDashboard() {
         <div class="thumb-avi">${c.avatar ? `<img src="${c.avatar}" alt="">` : (c.fname?.[0]||'').toUpperCase()}</div>
         <div class="thumb-name">${c.fname||''} ${c.lname||''}</div>
         <div class="thumb-title">${c.title||''}</div>
+        ${c.emp_id ? `<div class="thumb-empid">${c.emp_id}</div>` : ''}
       </div>
       <div class="thumb-body"><div class="thumb-email">${c.email||''}</div></div>
       <div class="thumb-actions">
@@ -1191,6 +1196,39 @@ async function shareViaNFC() {
       status.textContent = 'NFC failed: ' + err.message;
       toast('NFC error: ' + err.message);
     }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EMPLOYEE ID — auto-assign MIRAI11, MIRAI12, etc.
+// ═══════════════════════════════════════════════════════════════
+async function generateEmpId() {
+  try {
+    if (sbClient) {
+      // Get the highest existing emp_id number
+      const { data } = await sbClient
+        .from('cards')
+        .select('emp_id')
+        .not('emp_id', 'is', null)
+        .order('emp_id', { ascending: false })
+        .limit(1);
+
+      if (data && data.length > 0 && data[0].emp_id) {
+        // Extract number from e.g. "MIRAI11" → 11, increment
+        const num = parseInt(data[0].emp_id.replace('MIRAI', ''), 10);
+        if (!isNaN(num)) return 'MIRAI' + (num + 1);
+      }
+      return 'MIRAI11'; // first card
+    } else {
+      // localStorage fallback
+      const nums = localCards
+        .map(c => c.emp_id ? parseInt(c.emp_id.replace('MIRAI',''), 10) : 0)
+        .filter(n => !isNaN(n));
+      const max = nums.length ? Math.max(...nums) : 10;
+      return 'MIRAI' + (max + 1);
+    }
+  } catch(e) {
+    return 'MIRAI' + Date.now().toString().slice(-4); // fallback
   }
 }
 
