@@ -171,14 +171,14 @@ input,textarea,select { font-family:inherit; }
 .form-footer { display:flex; gap:12px; margin-top:28px; }
 
 /* ─────────────────────────── DASHBOARD ─────────────────────────── */
-#dashboard .inner { max-width:840px; margin:0 auto; padding:40px 24px; }
+#dashboard .inner { width:100%; padding:40px 40px; }
 .dash-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
 .dash-header h2 { font-family:'Instrument Serif',serif; font-size:34px; letter-spacing:-1px; }
-.cards-grid { display:flex; flex-wrap:wrap; gap:20px; }
+.cards-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:20px; }
 .card-thumb {
   background:var(--card); border:1px solid var(--border); border-radius:16px;
   overflow:hidden; cursor:pointer; transition:all .2s;
-  display:flex; flex-direction:column; width:260px; flex-shrink:0;
+  display:flex; flex-direction:column; width:100%;
 }
 .card-thumb:hover { transform:translateY(-4px); box-shadow:0 14px 40px rgba(0,0,0,.1); }
 .thumb-top { padding:28px 20px 18px; display:flex; flex-direction:column; align-items:center; }
@@ -302,6 +302,8 @@ input,textarea,select { font-family:inherit; }
   .nav { padding:14px 20px; }
   .form-grid { grid-template-columns:1fr; }
   .full { grid-column:1; }
+  #dashboard .inner { padding:24px 16px; }
+  .cards-grid { grid-template-columns:1fr 1fr; gap:12px; }
 }
 </style>
 </head>
